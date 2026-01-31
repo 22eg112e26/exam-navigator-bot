@@ -18,15 +18,17 @@ export default function Landing() {
             {/* Badge */}
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium mb-8 animate-fade-in">
               <Sparkles className="w-4 h-4" />
-              AI-Powered Learning Assistant
+              AI-Powered Intelligent Study Companion
             </div>
 
             {/* Main heading */}
             <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold text-foreground mb-6 leading-tight animate-slide-up">
-              Transform Your
-              <span className="block text-gradient">Study Material</span>
-              Into Success
+              <span className="text-gradient">EduGenius</span>
             </h1>
+            <h2 className="text-2xl md:text-3xl lg:text-4xl font-semibold text-muted-foreground mb-6 animate-slide-up">
+              An AI-Powered Intelligent Study Companion for
+              <span className="block text-foreground mt-2">Automated Question Generation and Personalized Learning</span>
+            </h2>
 
             {/* Subtitle */}
             <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-12 leading-relaxed animate-slide-up" style={{ animationDelay: '0.1s' }}>
@@ -101,7 +103,7 @@ export default function Landing() {
       {/* Footer */}
       <footer className="py-8 border-t border-border">
         <div className="container mx-auto px-4 text-center text-muted-foreground text-sm">
-          <p>© 2024 StudyGenius. Powered by AI to help you succeed.</p>
+          <p>© 2024 EduGenius. Powered by AI to help you succeed.</p>
         </div>
       </footer>
     </div>
