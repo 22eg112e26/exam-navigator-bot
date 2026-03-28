@@ -1,3 +1,6 @@
+// dashboard page - shows all features after pdf upload
+// user can go to different sections from here
+
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -17,6 +20,7 @@ export default function Dashboard() {
   const { session } = useStudy();
   const navigate = useNavigate();
 
+  // if no session redirect to home
   if (!session) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -37,7 +41,10 @@ export default function Dashboard() {
     );
   }
 
-  const features = [
+  console.log("dashboard loaded for:", session.pdfName);
+
+  // feature cards data
+  let featureList = [
     {
       title: 'Important Questions',
       description: 'Generate exam-oriented questions categorized by marks (2, 4, 6 marks)',
@@ -78,7 +85,7 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-12">
-        {/* Header */}
+        {/* header section */}
         <div className="mb-12">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-success/10 text-success text-sm font-medium mb-4">
             <FileText className="w-4 h-4" />
@@ -92,17 +99,17 @@ export default function Dashboard() {
           </p>
         </div>
 
-        {/* Feature Grid */}
+        {/* feature cards grid */}
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {features.map((feature, index) => (
+          {featureList.map((f, i) => (
             <FeatureCard
-              key={index}
-              {...feature}
+              key={i}
+              {...f}
             />
           ))}
         </div>
 
-        {/* Upload new */}
+        {/* upload new button */}
         <div className="mt-12 text-center">
           <Button
             variant="outline"

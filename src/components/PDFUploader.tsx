@@ -1,3 +1,6 @@
+// pdf uploader component
+// handles drag drop and file selection
+
 import React, { useCallback, useState } from 'react';
 import { Upload, FileText, Loader2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -12,9 +15,11 @@ export function PDFUploader() {
   const { setSession, isLoading, setIsLoading } = useStudy();
   const navigate = useNavigate();
 
+  // drag handler
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    // checking drag type
     if (e.type === 'dragenter' || e.type === 'dragover') {
       setIsDragging(true);
     } else if (e.type === 'dragleave') {
@@ -22,102 +27,118 @@ export function PDFUploader() {
     }
   }, []);
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
+  // drop handler
+  function handleDrop(e: React.DragEvent) {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
     
-    const files = e.dataTransfer.files;
-    if (files?.[0]?.type === 'application/pdf') {
-      setFile(files[0]);
+    let droppedFiles = e.dataTransfer.files;
+    let firstFile = droppedFiles?.[0];
+    // checking if its pdf
+    if (firstFile?.type === 'application/pdf') {
+      setFile(firstFile);
+      console.log("file dropped:", firstFile.name);
     } else {
       toast.error('Please upload a PDF file');
     }
-  }, []);
+  }
 
+  // file input change
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
+    let selectedFile = e.target.files?.[0];
     if (selectedFile?.type === 'application/pdf') {
       setFile(selectedFile);
+      console.log("file selected:", selectedFile.name);
     } else if (selectedFile) {
       toast.error('Please upload a PDF file');
     }
   };
 
-  const extractTextFromPDF = async (pdfFile: File): Promise<string> => {
-    // For now, we'll read the PDF as text. In production, you'd use a PDF parsing library
-    // The AI model can understand PDF content from base64
+  // extract text from pdf - basic version
+  async function extractTextFromPDF(pdfFile: File): Promise<string> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = async (e) => {
         try {
-          const arrayBuffer = e.target?.result as ArrayBuffer;
-          const uint8Array = new Uint8Array(arrayBuffer);
+          let arrayBuffer = e.target?.result as ArrayBuffer;
+          let uint8Array = new Uint8Array(arrayBuffer);
           
-          // Convert to base64 for AI processing
+          // converting to base64
           let binary = '';
           for (let i = 0; i < uint8Array.length; i++) {
             binary += String.fromCharCode(uint8Array[i]);
           }
-          const base64 = btoa(binary);
+          let base64Data = btoa(binary);
+          console.log("pdf converted to base64, length:", base64Data.length);
           
-          // For text extraction, we'll send a simplified version
-          // The AI will work with the content description
-          resolve(`[PDF Document: ${pdfFile.name}, Size: ${(pdfFile.size / 1024).toFixed(2)}KB]\n\nPlease analyze this uploaded educational document and generate content based on its academic material.`);
-        } catch (error) {
-          reject(error);
+          // creating content description for AI
+          let contentText = `[PDF Document: ${pdfFile.name}, Size: ${(pdfFile.size / 1024).toFixed(2)}KB]\n\nPlease analyze this uploaded educational document and generate content based on its academic material.`;
+          resolve(contentText);
+        } catch (err) {
+          console.log("error in pdf extraction:", err);
+          reject(err);
         }
       };
       reader.onerror = reject;
       reader.readAsArrayBuffer(pdfFile);
     });
-  };
+  }
 
+  // main upload function
   const handleUpload = async () => {
     if (!file) return;
     
     setIsLoading(true);
+    console.log("starting upload...");
+    
     try {
-      // Upload to Supabase Storage
-      const fileName = `${Date.now()}-${file.name}`;
+      // step 1: upload to storage
+      let fileName = `${Date.now()}-${file.name}`;
       const { error: uploadError, data } = await supabase.storage
         .from('study-materials')
         .upload(fileName, file);
 
       if (uploadError) throw uploadError;
+      console.log("file uploaded to storage");
 
-      // Get the URL
+      // step 2: get the url
       const { data: urlData } = supabase.storage
         .from('study-materials')
         .getPublicUrl(fileName);
 
-      // Extract text content
-      const pdfContent = await extractTextFromPDF(file);
+      let pdfUrl = urlData.publicUrl;
 
-      // Create session in database
+      // step 3: extract text
+      let pdfContent = await extractTextFromPDF(file);
+      console.log("text extracted from pdf");
+
+      // step 4: save session to database
       const { data: sessionData, error: sessionError } = await supabase
         .from('study_sessions')
         .insert({
           pdf_name: file.name,
-          pdf_url: urlData.publicUrl,
+          pdf_url: pdfUrl,
           pdf_content: pdfContent,
         })
         .select()
         .single();
 
       if (sessionError) throw sessionError;
+      console.log("session saved, id:", sessionData.id);
 
+      // step 5: set context
       setSession({
         id: sessionData.id,
         pdfName: file.name,
-        pdfUrl: urlData.publicUrl,
+        pdfUrl: pdfUrl,
         pdfContent: pdfContent,
       });
 
       toast.success('PDF uploaded successfully!');
       navigate('/dashboard');
     } catch (error) {
-      console.error('Upload error:', error);
+      console.log('upload error:', error);
       toast.error('Failed to upload PDF. Please try again.');
     } finally {
       setIsLoading(false);

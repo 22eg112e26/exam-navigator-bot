@@ -1,29 +1,42 @@
+// edge function to analyze pdf content using ai
+// handles different types - questions, topics, mockTest, questionPaper, analyze
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
+// cors headers
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 serve(async (req) => {
+  // handling cors
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { pdfContent, type, testAnswers } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    
-    if (!LOVABLE_API_KEY) {
+    // getting request data
+    const reqBody = await req.json();
+    let pdfContent = reqBody.pdfContent;
+    let type = reqBody.type;
+    let testAnswers = reqBody.testAnswers;
+
+    console.log("processing request, type:", type);
+
+    // getting api key
+    const apiKey = Deno.env.get("LOVABLE_API_KEY");
+    if (!apiKey) {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    let systemPrompt = "";
+    // setting up prompts based on type
+    let sysPrompt = "";
     let userPrompt = "";
 
-    switch (type) {
-      case "questions":
-        systemPrompt = `You are an expert academic question paper generator. Your task is to analyze study material and generate exam-oriented important questions. 
+    // checking type and setting prompts
+    if (type === "questions") {
+      sysPrompt = `You are an expert academic question paper generator. Your task is to analyze study material and generate exam-oriented important questions. 
 
 CRITICAL RULES:
 1. Generate questions ONLY from the provided content
@@ -37,11 +50,9 @@ Output format:
   "fourMarks": ["question1", "question2", ...],
   "sixMarks": ["question1", "question2", ...]
 }`;
-        userPrompt = `Analyze the following study material and generate important exam questions categorized by marks:\n\n${pdfContent}`;
-        break;
-
-      case "topics":
-        systemPrompt = `You are an expert at extracting key topics from academic content. Your task is to identify the most important topics for exam preparation.
+      userPrompt = `Analyze the following study material and generate important exam questions categorized by marks:\n\n${pdfContent}`;
+    } else if (type === "topics") {
+      sysPrompt = `You are an expert at extracting key topics from academic content. Your task is to identify the most important topics for exam preparation.
 
 CRITICAL RULES:
 1. Extract topics ONLY from the provided content
@@ -56,11 +67,9 @@ Output format:
     ...
   ]
 }`;
-        userPrompt = `Extract the most important topics from this study material:\n\n${pdfContent}`;
-        break;
-
-      case "mockTest":
-        systemPrompt = `You are an expert MCQ generator for academic exams. Your task is to create a balanced mock test.
+      userPrompt = `Extract the most important topics from this study material:\n\n${pdfContent}`;
+    } else if (type === "mockTest") {
+      sysPrompt = `You are an expert MCQ generator for academic exams. Your task is to create a balanced mock test.
 
 CRITICAL RULES:
 1. Generate EXACTLY 20 MCQs from the provided content
@@ -83,11 +92,9 @@ Output format:
     ...
   ]
 }`;
-        userPrompt = `Generate a 20-question MCQ mock test from this study material:\n\n${pdfContent}`;
-        break;
-
-      case "questionPaper":
-        systemPrompt = `You are an expert academic question paper designer. Create a complete exam-style question paper.
+      userPrompt = `Generate a 20-question MCQ mock test from this study material:\n\n${pdfContent}`;
+    } else if (type === "questionPaper") {
+      sysPrompt = `You are an expert academic question paper designer. Create a complete exam-style question paper.
 
 CRITICAL RULES:
 1. Create questions ONLY from the provided content
@@ -121,11 +128,9 @@ Output format:
     }
   ]
 }`;
-        userPrompt = `Create a complete examination question paper from this study material:\n\n${pdfContent}`;
-        break;
-
-      case "analyze":
-        systemPrompt = `You are an expert performance analyzer for academic tests. Analyze the student's mock test performance.
+      userPrompt = `Create a complete examination question paper from this study material:\n\n${pdfContent}`;
+    } else if (type === "analyze") {
+      sysPrompt = `You are an expert performance analyzer for academic tests. Analyze the student's mock test performance.
 
 CRITICAL RULES:
 1. Provide detailed performance analysis
@@ -148,79 +153,88 @@ Output format:
     {"topic": "name", "performance": "good/average/poor", "recommendation": "text"}
   ]
 }`;
-        userPrompt = `Analyze this mock test performance. Study material:\n${pdfContent}\n\nTest answers with results:\n${JSON.stringify(testAnswers)}`;
-        break;
-
-      default:
-        throw new Error("Invalid analysis type");
+      userPrompt = `Analyze this mock test performance. Study material:\n${pdfContent}\n\nTest answers with results:\n${JSON.stringify(testAnswers)}`;
+    } else {
+      throw new Error("Invalid analysis type");
     }
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    console.log("sending request to ai gateway...");
+
+    // calling ai gateway
+    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
         model: "google/gemini-3-flash-preview",
         messages: [
-          { role: "system", content: systemPrompt },
+          { role: "system", content: sysPrompt },
           { role: "user", content: userPrompt },
         ],
         temperature: 0.7,
       }),
     });
 
-    if (!response.ok) {
-      if (response.status === 429) {
+    // handling errors
+    if (!aiResponse.ok) {
+      let statusCode = aiResponse.status;
+      console.log("ai gateway error, status:", statusCode);
+      
+      if (statusCode === 429) {
         return new Response(JSON.stringify({ error: "Rate limits exceeded. Please try again later." }), {
           status: 429,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      if (response.status === 402) {
+      if (statusCode === 402) {
         return new Response(JSON.stringify({ error: "Usage limit reached. Please add credits to continue." }), {
           status: 402,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      const errorText = await response.text();
-      console.error("AI gateway error:", response.status, errorText);
+      let errText = await aiResponse.text();
+      console.log("error details:", errText);
       return new Response(JSON.stringify({ error: "AI processing failed" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const data = await response.json();
-    const content = data.choices?.[0]?.message?.content;
+    // parsing response
+    let aiData = await aiResponse.json();
+    let content = aiData.choices?.[0]?.message?.content;
+    console.log("got ai response, length:", content?.length);
 
     if (!content) {
       throw new Error("No content received from AI");
     }
 
-    // Extract JSON from the response
-    let jsonContent = content;
-    const jsonMatch = content.match(/```json\n?([\s\S]*?)\n?```/);
-    if (jsonMatch) {
-      jsonContent = jsonMatch[1];
+    // extracting json from response
+    let jsonStr = content;
+    let match = content.match(/```json\n?([\s\S]*?)\n?```/);
+    if (match) {
+      jsonStr = match[1];
     }
 
-    // Try to parse as JSON, if fails return raw content
+    // trying to parse json
     try {
-      const parsed = JSON.parse(jsonContent);
+      let parsed = JSON.parse(jsonStr);
+      console.log("json parsed successfully");
       return new Response(JSON.stringify({ result: parsed }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     } catch {
+      console.log("json parse failed, returning raw content");
       return new Response(JSON.stringify({ result: content }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-  } catch (error) {
-    console.error("Error:", error);
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    return new Response(JSON.stringify({ error: errorMessage }), {
+  } catch (err) {
+    console.log("error in analyze-pdf:", err);
+    let msg = err instanceof Error ? err.message : "Unknown error";
+    return new Response(JSON.stringify({ error: msg }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
