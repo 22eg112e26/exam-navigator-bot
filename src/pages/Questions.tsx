@@ -1,3 +1,6 @@
+// questions page - shows generated questions from pdf
+// questions are divided into 2, 4, 6 marks
+
 import React, { useEffect, useState } from 'react';
 import { FileQuestion } from 'lucide-react';
 import { useStudy } from '@/lib/studyContext';
@@ -8,6 +11,7 @@ import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useNavigate } from 'react-router-dom';
 
+// type for questions
 interface QuestionsData {
   twoMarks: string[];
   fourMarks: string[];
@@ -21,35 +25,43 @@ export default function Questions() {
   const [questions, setQuestions] = useState<QuestionsData | null>(null);
 
   useEffect(() => {
+    // checking if session exists
     if (!session) {
       navigate('/');
       return;
     }
 
-    async function generateQuestions() {
+    // function to get questions from ai
+    async function getQuestions() {
+      console.log("generating questions...");
       try {
+        let body = { pdfContent: session.pdfContent, type: 'questions' };
         const { data, error } = await supabase.functions.invoke('analyze-pdf', {
-          body: { pdfContent: session.pdfContent, type: 'questions' },
+          body: body,
         });
 
         if (error) throw error;
 
-        if (data.result) {
-          setQuestions(data.result);
+        // setting questions data
+        let result = data.result;
+        if (result) {
+          console.log("questions generated successfully");
+          setQuestions(result);
         }
-      } catch (error) {
-        console.error('Error generating questions:', error);
+      } catch (err) {
+        console.log('error getting questions:', err);
         toast.error('Failed to generate questions. Please try again.');
       } finally {
         setLoading(false);
       }
     }
 
-    generateQuestions();
+    getQuestions();
   }, [session, navigate]);
 
   if (!session) return null;
 
+  // loading state
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
@@ -83,26 +95,26 @@ export default function Questions() {
             </TabsList>
 
             <TabsContent value="two">
-              <QuestionList 
-                questions={questions.twoMarks} 
-                marks={2}
-                description="Short answer questions - answer in 2-3 sentences"
+              <ShowQuestions 
+                qList={questions.twoMarks} 
+                m={2}
+                desc="Short answer questions - answer in 2-3 sentences"
               />
             </TabsContent>
 
             <TabsContent value="four">
-              <QuestionList 
-                questions={questions.fourMarks} 
-                marks={4}
-                description="Medium answer questions - answer in a short paragraph"
+              <ShowQuestions 
+                qList={questions.fourMarks} 
+                m={4}
+                desc="Medium answer questions - answer in a short paragraph"
               />
             </TabsContent>
 
             <TabsContent value="six">
-              <QuestionList 
-                questions={questions.sixMarks} 
-                marks={6}
-                description="Long answer questions - answer with detailed explanation"
+              <ShowQuestions 
+                qList={questions.sixMarks} 
+                m={6}
+                desc="Long answer questions - answer with detailed explanation"
               />
             </TabsContent>
           </Tabs>
@@ -116,34 +128,35 @@ export default function Questions() {
   );
 }
 
-function QuestionList({ 
-  questions, 
-  marks, 
-  description 
+// component to show list of questions
+function ShowQuestions({ 
+  qList, 
+  m, 
+  desc 
 }: { 
-  questions: string[]; 
-  marks: number;
-  description: string;
+  qList: string[]; 
+  m: number;
+  desc: string;
 }) {
   return (
     <div>
       <div className="mb-6 p-4 rounded-xl bg-muted/50 border border-border">
-        <p className="text-sm text-muted-foreground">{description}</p>
+        <p className="text-sm text-muted-foreground">{desc}</p>
       </div>
       <div className="space-y-4">
-        {questions?.map((question, index) => (
+        {qList?.map((q, i) => (
           <div
-            key={index}
+            key={i}
             className="p-5 rounded-xl bg-card border border-border shadow-soft hover:shadow-medium transition-shadow"
           >
             <div className="flex items-start gap-4">
               <span className="flex-shrink-0 w-8 h-8 rounded-lg bg-primary/10 text-primary text-sm font-semibold flex items-center justify-center">
-                {index + 1}
+                {i + 1}
               </span>
               <div className="flex-1">
-                <p className="text-card-foreground leading-relaxed">{question}</p>
+                <p className="text-card-foreground leading-relaxed">{q}</p>
                 <span className="inline-block mt-3 px-2 py-1 rounded-md bg-muted text-muted-foreground text-xs font-medium">
-                  {marks} marks
+                  {m} marks
                 </span>
               </div>
             </div>

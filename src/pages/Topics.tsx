@@ -1,3 +1,6 @@
+// topics page - shows important topics from pdf
+// topics have importance level - high, medium, low
+
 import React, { useEffect, useState } from 'react';
 import { Lightbulb, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { useStudy } from '@/lib/studyContext';
@@ -7,21 +10,18 @@ import { LoadingState } from '@/components/LoadingState';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 
+// topic type
 interface Topic {
   title: string;
   description: string;
   importance: 'high' | 'medium' | 'low';
 }
 
-interface TopicsData {
-  topics: Topic[];
-}
-
 export default function Topics() {
   const { session } = useStudy();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [topics, setTopics] = useState<Topic[]>([]);
+  const [topicsList, setTopicsList] = useState<Topic[]>([]);
 
   useEffect(() => {
     if (!session) {
@@ -29,26 +29,31 @@ export default function Topics() {
       return;
     }
 
-    async function extractTopics() {
+    // getting topics from ai
+    async function getTopics() {
+      console.log("extracting topics...");
       try {
+        let reqData = { pdfContent: session.pdfContent, type: 'topics' };
         const { data, error } = await supabase.functions.invoke('analyze-pdf', {
-          body: { pdfContent: session.pdfContent, type: 'topics' },
+          body: reqData,
         });
 
         if (error) throw error;
 
-        if (data.result?.topics) {
-          setTopics(data.result.topics);
+        let result = data.result;
+        if (result?.topics) {
+          console.log("got", result.topics.length, "topics");
+          setTopicsList(result.topics);
         }
-      } catch (error) {
-        console.error('Error extracting topics:', error);
+      } catch (err) {
+        console.log('error extracting topics:', err);
         toast.error('Failed to extract topics. Please try again.');
       } finally {
         setLoading(false);
       }
     }
 
-    extractTopics();
+    getTopics();
   }, [session, navigate]);
 
   if (!session) return null;
@@ -68,13 +73,15 @@ export default function Topics() {
     );
   }
 
-  const importanceIcon = {
+  // icons for importance
+  let impIcon: Record<string, JSX.Element> = {
     high: <TrendingUp className="w-4 h-4" />,
     medium: <Minus className="w-4 h-4" />,
     low: <TrendingDown className="w-4 h-4" />,
   };
 
-  const importanceColors = {
+  // colors for importance
+  let impColors: Record<string, string> = {
     high: 'bg-destructive/10 text-destructive border-destructive/20',
     medium: 'bg-warning/10 text-warning-foreground border-warning/20',
     low: 'bg-muted text-muted-foreground border-border',
@@ -89,24 +96,24 @@ export default function Topics() {
           icon={Lightbulb}
         />
 
-        {topics.length > 0 ? (
+        {topicsList.length > 0 ? (
           <div className="grid md:grid-cols-2 gap-4">
-            {topics.map((topic, index) => (
+            {topicsList.map((t, i) => (
               <div
-                key={index}
+                key={i}
                 className="p-5 rounded-xl bg-card border border-border shadow-soft hover:shadow-medium transition-all duration-300 hover:-translate-y-0.5"
               >
                 <div className="flex items-start justify-between gap-4 mb-3">
                   <h3 className="text-lg font-semibold text-card-foreground">
-                    {topic.title}
+                    {t.title}
                   </h3>
-                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border ${importanceColors[topic.importance]}`}>
-                    {importanceIcon[topic.importance]}
-                    {topic.importance}
+                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border ${impColors[t.importance]}`}>
+                    {impIcon[t.importance]}
+                    {t.importance}
                   </span>
                 </div>
                 <p className="text-muted-foreground leading-relaxed">
-                  {topic.description}
+                  {t.description}
                 </p>
               </div>
             ))}

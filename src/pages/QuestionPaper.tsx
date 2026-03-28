@@ -1,3 +1,6 @@
+// question paper page
+// generates a full exam style paper with sections
+
 import React, { useEffect, useState } from 'react';
 import { FileText, Clock, Award, Printer } from 'lucide-react';
 import { useStudy } from '@/lib/studyContext';
@@ -8,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 
+// section type
 interface Section {
   name: string;
   marks: number;
@@ -15,7 +19,8 @@ interface Section {
   questions: string[];
 }
 
-interface QuestionPaperData {
+// paper type
+interface PaperData {
   title: string;
   totalMarks: number;
   duration: string;
@@ -26,7 +31,7 @@ export default function QuestionPaper() {
   const { session } = useStudy();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [paper, setPaper] = useState<QuestionPaperData | null>(null);
+  const [paper, setPaper] = useState<PaperData | null>(null);
 
   useEffect(() => {
     if (!session) {
@@ -34,31 +39,38 @@ export default function QuestionPaper() {
       return;
     }
 
-    async function generatePaper() {
+    // generating paper from ai
+    async function getPaper() {
+      console.log("generating question paper...");
       try {
+        let reqBody = { pdfContent: session.pdfContent, type: 'questionPaper' };
         const { data, error } = await supabase.functions.invoke('analyze-pdf', {
-          body: { pdfContent: session.pdfContent, type: 'questionPaper' },
+          body: reqBody,
         });
 
         if (error) throw error;
 
-        if (data.result) {
-          setPaper(data.result);
+        let result = data.result;
+        if (result) {
+          console.log("paper generated, sections:", result.sections?.length);
+          setPaper(result);
         }
-      } catch (error) {
-        console.error('Error generating question paper:', error);
+      } catch (err) {
+        console.log('error generating paper:', err);
         toast.error('Failed to generate question paper. Please try again.');
       } finally {
         setLoading(false);
       }
     }
 
-    generatePaper();
+    getPaper();
   }, [session, navigate]);
 
-  const handlePrint = () => {
+  // print function
+  function printPaper() {
+    console.log("printing paper...");
     window.print();
-  };
+  }
 
   if (!session) return null;
 
@@ -90,7 +102,7 @@ export default function QuestionPaper() {
 
         {paper ? (
           <div className="bg-card border border-border rounded-2xl shadow-soft overflow-hidden">
-            {/* Paper Header */}
+            {/* paper header */}
             <div className="p-8 border-b border-border text-center bg-muted/30">
               <h2 className="text-2xl font-bold text-card-foreground mb-4">
                 {paper.title}
@@ -107,7 +119,7 @@ export default function QuestionPaper() {
               </div>
             </div>
 
-            {/* Instructions */}
+            {/* instructions */}
             <div className="p-6 border-b border-border bg-warning/5">
               <h3 className="font-semibold text-foreground mb-2">General Instructions:</h3>
               <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
@@ -118,29 +130,29 @@ export default function QuestionPaper() {
               </ul>
             </div>
 
-            {/* Sections */}
+            {/* sections */}
             <div className="p-8 space-y-10">
-              {paper.sections.map((section, sectionIdx) => (
-                <div key={sectionIdx}>
+              {paper.sections.map((sec, secIdx) => (
+                <div key={secIdx}>
                   <div className="flex items-center justify-between mb-4 pb-2 border-b border-border">
-                    <h3 className="text-xl font-bold text-foreground">{section.name}</h3>
+                    <h3 className="text-xl font-bold text-foreground">{sec.name}</h3>
                     <span className="px-3 py-1 rounded-lg bg-primary/10 text-primary text-sm font-medium">
-                      {section.marks} marks each
+                      {sec.marks} marks each
                     </span>
                   </div>
                   <p className="text-sm text-muted-foreground mb-4 italic">
-                    {section.instructions}
+                    {sec.instructions}
                   </p>
                   <ol className="space-y-4">
-                    {section.questions.map((question, qIdx) => (
+                    {sec.questions.map((q, qIdx) => (
                       <li key={qIdx} className="flex gap-4 p-4 rounded-xl bg-muted/30">
                         <span className="flex-shrink-0 w-8 h-8 rounded-lg bg-primary/10 text-primary text-sm font-semibold flex items-center justify-center">
-                          {sectionIdx + 1}.{qIdx + 1}
+                          {secIdx + 1}.{qIdx + 1}
                         </span>
                         <div className="flex-1">
-                          <p className="text-foreground leading-relaxed">{question}</p>
+                          <p className="text-foreground leading-relaxed">{q}</p>
                           <span className="inline-block mt-2 text-xs text-muted-foreground">
-                            [{section.marks} marks]
+                            [{sec.marks} marks]
                           </span>
                         </div>
                       </li>
@@ -150,7 +162,7 @@ export default function QuestionPaper() {
               ))}
             </div>
 
-            {/* Footer */}
+            {/* footer */}
             <div className="p-6 border-t border-border bg-muted/30 text-center">
               <p className="text-sm text-muted-foreground">*** End of Question Paper ***</p>
             </div>
@@ -161,9 +173,9 @@ export default function QuestionPaper() {
           </div>
         )}
 
-        {/* Print button */}
+        {/* print button */}
         <div className="mt-8 flex justify-center print:hidden">
-          <Button onClick={handlePrint} variant="outline" size="lg">
+          <Button onClick={printPaper} variant="outline" size="lg">
             <Printer className="w-4 h-4 mr-2" />
             Print Question Paper
           </Button>
